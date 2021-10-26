@@ -1,0 +1,85 @@
+CASL  START  BEGIN  
+BEGIN  LAD  GR6, 0
+  LAD  GR7, LIBBUF
+  LAD  GR2, 0
+  LD  GR3, GR2
+  LAD  GR1, 1
+  ST  GR1, VAR, GR3
+  LAD  GR2, 0
+  LD  GR1, VAR, GR2
+  XOR  GR1, =1
+  LD  GR2, GR1
+  PUSH  0, GR1
+  LAD  GR1, 1
+  LD  GR2, GR1
+  POP  GR2
+  CPL  GR2, GR1
+  JNZ  ELSE0
+  LD  GR2, GR1
+  LAD  GR1, 4
+  LAD  GR2, CHAR0
+  CALL  WRTSTR
+  LAD  GR4, 0
+  CALL  WRTLN
+  JUMP  FIN0
+ELSE0  NOP
+  LD  GR2, GR1
+  LAD  GR1, 4
+  LAD  GR2, CHAR1
+  CALL  WRTSTR
+  LAD  GR4, 0
+  CALL  WRTLN
+FIN0  NOP
+ RET  
+CHAR0  DC  'then'
+CHAR1  DC  'else'
+VAR  DS  1
+LIBBUF DS 256
+  END
+;============================================================
+; GR2の指すメモリ番地から，長さGR1の文字列を出力装置に書き出すサブルーチン
+WRTSTR	START
+	LAD	GR3,0	; GR3は制御変数として用いる
+LOOP	CPA	GR3,GR1
+	JZE	END
+	LD	GR4,GR2
+	ADDA	GR4,GR3	; 出力する文字の格納番地を計算
+	LD	GR5,0,GR4	; 出力する文字をレジスタにコピー
+	LD	GR4,GR7
+	ADDA	GR4,GR6	; 出力先の番地を計算
+	ST	GR5,0,GR4	; 出力装置に書き出し
+	LAD	GR3,1,GR3
+	LAD	GR6,1,GR6
+	JUMP	LOOP
+END RET
+	END
+;============================================================
+; 改行を出力装置に書き出すサブルーチン
+; 実質的には，GR7で始まるアドレス番地から長さGR6の文字列を出力する
+WRTLN	START
+	ST	GR6,OUTLEN
+	LAD	GR1,0
+LOOP	CPA	GR1,OUTLEN
+	JZE	END
+	LD	GR2,GR7
+	ADDA	GR2,GR1
+	LD	GR3,0,GR2
+	ST	GR3,OUTSTR,GR1
+	LAD	GR1,1,GR1
+	JUMP	LOOP
+END	OUT	OUTSTR,OUTLEN
+	LAD	GR6,0	; 文字列を出力して，GR6を初期化
+	RET
+OUTSTR	DS	256
+OUTLEN	DS	1
+	END
+;========================================================
+; extended library set GR2 1 (if GR1 == GR2) 0 (else)
+EQUAL	START
+ CPA     GR1,  GR2
+ JZE     ZERO
+ LAD     GR2, 0
+ JUMP    FIN
+ZERO LAD GR2, 1
+FIN RET
+ END

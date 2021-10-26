@@ -1,0 +1,113 @@
+CASL  START  BEGIN  
+BEGIN  LAD  GR6, 0
+  LAD  GR7, LIBBUF
+  LAD  GR2, 0
+  LD  GR3, GR2
+  LAD  GR1, 1
+  ST  GR1, VAR, GR3
+  LAD  GR2, 0
+  LD  GR2, VAR, GR2
+  CALL  WRTINT
+  LAD  GR4, 0
+  CALL  WRTLN
+ RET  
+VAR  DS  1
+LIBBUF DS 256
+  END
+;============================================================
+; DIV 割り算を行うサブルーチン
+; GR1 / GR2 -> 商は GR2, 余りは GR1
+DIV	START
+	PUSH	0,GR3
+	LD	GR0,GR1
+	ST	GR2,B
+	CPA	GR1,=0
+	JPL	SKIPA
+	XOR	GR1,=#FFFF
+	ADDA	GR1,=1
+SKIPA	CPA	GR2,=0
+	JZE	SKIPD
+	JPL	SKIPB
+	XOR	GR2,=#FFFF
+	ADDA	GR2,=1
+SKIPB	LD	GR3,=0
+LOOP	CPA	GR1,GR2
+	JMI	STEP
+	SUBA	GR1,GR2
+	LAD	GR3,1,GR3
+	JUMP	LOOP
+STEP	LD	GR2,GR3
+	LD	GR3,GR0
+	CPA	GR3,=0
+	JPL	SKIPC
+	XOR	GR1,=#FFFF
+	ADDA	GR1,=1
+SKIPC	XOR	GR3,B
+	CPA	GR3,=0
+	JZE	SKIPD
+	JPL	SKIPD
+	XOR	GR2,=#FFFF
+	ADDA	GR2,=1
+SKIPD	POP	GR3
+	RET
+B	DS	1
+	END
+;============================================================
+; GR2の内容（数値データ）を出力装置に書き出すサブルーチン
+WRTINT	START
+	PUSH	0,GR2	; 数値データをもう一度スタックに退避
+	LD	GR3,=0	; GR3はインデックスとして用いる
+	; 数値データが負数である場合は，正の数に変換
+	CPA	GR2,=0
+	JPL	LOOP1
+	XOR	GR2,=#FFFF
+	ADDA	GR2,=1
+	; 数値データを変換しながら，バッファに格納
+LOOP1	LD	GR1,GR2
+	LD	GR2,=10
+	CALL	DIV
+	XOR	GR1,=#0030
+	ST	GR1,BUFFER,GR3
+	LAD	GR3,1,GR3
+	CPA	GR2,=0
+	JNZ	LOOP1
+	; 数値データが負数であれば，'-'を追加
+	POP	GR2
+	CPA	GR2,=0
+	JZE	LOOP2
+	JPL	LOOP2
+	LD	GR1,='-'
+	ST	GR1,BUFFER,GR3
+	LAD	GR3,1,GR3
+	; BUFFERを逆順にたどりながら，出力用バッファに格納
+LOOP2	LAD	GR3,-1,GR3
+	LD	GR1,BUFFER,GR3
+	LD	GR2,GR7
+	ADDA	GR2,GR6
+	ST	GR1,0,GR2
+	LAD	GR6,1,GR6
+	CPA	GR3,=0
+	JNZ	LOOP2
+END	RET
+BUFFER	DS	6
+	END
+;============================================================
+; 改行を出力装置に書き出すサブルーチン
+; 実質的には，GR7で始まるアドレス番地から長さGR6の文字列を出力する
+WRTLN	START
+	ST	GR6,OUTLEN
+	LAD	GR1,0
+LOOP	CPA	GR1,OUTLEN
+	JZE	END
+	LD	GR2,GR7
+	ADDA	GR2,GR1
+	LD	GR3,0,GR2
+	ST	GR3,OUTSTR,GR1
+	LAD	GR1,1,GR1
+	JUMP	LOOP
+END	OUT	OUTSTR,OUTLEN
+	LAD	GR6,0	; 文字列を出力して，GR6を初期化
+	RET
+OUTSTR	DS	256
+OUTLEN	DS	1
+	END
