@@ -2,6 +2,7 @@
 ;https://github.com/soundscope/enshud/blob/main/quine.cas
 ;casl2 quine program
 ;OUT macro have to append "\n".
+;please use https://github.com/kusumotolab/jcasl2-jcomet2 (2021 Oct)
 MAIN START
  LAD GR2,0
  LAD GR3,0
