@@ -1,3 +1,5 @@
+;confirmed https://www.jitec.ipa.go.jp/1_20casl2/casl2dl_001 (2021 Oct)
+;javaCASL2_2.0 (casl2.jar & run.jar)
 MAIN START
  LAD GR2,0
  LAD GR3,0
