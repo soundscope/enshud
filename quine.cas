@@ -1,4 +1,5 @@
 ;Made by soundscope under MIT License
+;https://github.com/soundscope/enshud/blob/main/quine.cas
 ;casl2 quine program
 ;OUT macro have to append "\n".
 MAIN START
