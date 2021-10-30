@@ -1,0 +1,72 @@
+;Made by soundscope under MIT License
+;casl2 quine program
+;OUT macro have to append "\n".
+MAIN START
+ LAD GR2,0
+ LAD GR3,0
+ CALL L
+ LAD GR3,238
+ CALL L
+ LAD GR3,476
+ CALL L
+ OUT Q,LG
+ OUT W,LG
+ OUT X,LG
+ OUT E,C
+ RET
+L CPA GR2,=238
+ JZE F
+ ADDA GR2,GR3 
+ LD GR1,S,GR2 
+ LD GR4,GR3
+ SRL GR4,5
+ ADDA GR4,GR2
+ ST GR1,QR,GR4        
+ CPA GR1,=64
+ JZE JJ
+ JUMP FF
+JJ LAD GR1,10
+FF SUBA GR2,GR3
+ ST GR1,V,GR2
+ LAD GR2,1,GR2
+ JUMP L
+F OUT V,LS
+ LAD GR2,0
+ RET
+Q DC 83
+ DC 32
+ DC 68
+ DC 67
+ DC 32 
+ DC 39
+QR DS 238
+ DC 39
+W DC 84
+ DC 32
+ DC 68
+ DC 67
+ DC 32
+ DC 39
+WR DS 238 
+ DC 39
+X DC 85
+ DC 32
+ DC 68
+ DC 67
+ DC 32
+ DC 39
+XR DS 238
+ DC 39
+E DC 32
+ DC 69
+ DC 78
+ DC 68
+C DC 4
+LEN DC 1
+LS DC 238
+LG DC 245
+V DS 238                                                                                                  
+S DC 'MAIN START@ LAD GR2,0@ LAD GR3,0@ CALL L@ LAD GR3,238@ CALL L@ LAD GR3,476@ CALL L@ OUT Q,LG@ OUT W,LG@ OUT X,LG@ OUT E,C@ RET@L CPA GR2,=238@ JZE F@ ADDA GR2,GR3 @ LD GR1,S,GR2 @ LD GR4,GR3@ SRL GR4,5@ ADDA GR4,GR2@ ST GR1,QR,GR4        '
+T DC ' CPA GR1,=64@ JZE JJ@ JUMP FF@JJ LAD GR1,10@FF SUBA GR2,GR3@ ST GR1,V,GR2@ LAD GR2,1,GR2@ JUMP L@F OUT V,LS@ LAD GR2,0@ RET@Q DC 83@ DC 32@ DC 68@ DC 67@ DC 32 @ DC 39@QR DS 238@ DC 39@W DC 84@ DC 32@ DC 68@ DC 67@ DC 32@ DC 39@WR DS 238 '
+U DC ' DC 39@X DC 85@ DC 32@ DC 68@ DC 67@ DC 32@ DC 39@XR DS 238@ DC 39@E DC 32@ DC 69@ DC 78@ DC 68@C DC 4@LEN DC 1@LS DC 238@LG DC 245@V DS 238                                                                                                  '
+ END
