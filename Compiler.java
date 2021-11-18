@@ -12,7 +12,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import enshud.casl.CaslSimulator;
 import enshud.s1.lexer.Lexer;
@@ -26,6 +27,8 @@ public class Compiler {
 	public static void main(final String[] args) {
 		long time = 0;
 		int target = 19;
+
+
 		// Compilerを実行してcasを生成する
 		/*
 		for(int i = 1; i <= 20; i++) { 
@@ -36,6 +39,7 @@ public class Compiler {
 				time += System.currentTimeMillis();
 
 			}
+
 			if(i < 10) {
 				new Lexer().run("data/pas/normal0" + i +".pas", "tmp/abc.ts");
 				new Compiler().run("tmp/abc.ts", "tmp/out0"+ i +".cas");
@@ -47,19 +51,22 @@ public class Compiler {
 		}
 		//*/
 
-		/*
-		if(false) { //debug
+		///*
+		if(true) { //debug
 			new Lexer().run("data/pas/abc.pas", "tmp/abc.ts");
 			new Compiler().run("tmp/abc.ts", "tmp/out.cas");
 		} else {
-			new Compiler().run("data/ts/normal02.ts", "tmp/out.cas");
+			new Compiler().run("data/ts/normal19.ts", "tmp/out.cas");
 		}
+		//*/
 
 		// 上記casを，CASLアセンブラ & COMETシミュレータで実行する
+		time -= System.currentTimeMillis();
 
 		CaslSimulator.run("tmp/out.cas", "tmp/out.ans");
-		//*/
-		//System.out.println(time);
+		time += System.currentTimeMillis();
+
+		System.out.println(time);
 	}
 
 	/**
@@ -87,6 +94,7 @@ public class Compiler {
 	String constStr = ""; // now constStr (set by constant())
 	int constNum = 0; // now constNumber (set by constant())
 	int constStrIndex = 0; //num of constStr for DC
+	int prevVariableCnt = 0;
 	int variableCnt = 0; //num of variable
 	Stack<Integer> whileNameStack; //stack for manage "while" syntax depth
 	Stack<Integer> ifNameStack; ///stack for manage "if" syntax depth
@@ -130,7 +138,7 @@ public class Compiler {
 		subProgramMap = new HashMap<String, Integer>();
 		nowProgramName = "_";
 		constStr = "";
-		
+
 		whileNameStack = new Stack<Integer>();
 		ifNameStack = new Stack<Integer>();
 		outPutBuf = new outPutBuffer();
@@ -165,6 +173,7 @@ public class Compiler {
 		}
 
 		libAppend();
+
 		outPutBuf.write(outputFileName);
 	}
 
@@ -385,10 +394,8 @@ public class Compiler {
 		}
 		return true;
 	}	
-
 	protected boolean standardType(int arrayLen, boolean isParam) {
 		st = getToken();
-
 		for(String nowName: variableQueue) {
 			if(arrayLen == 0) { //variable
 				//boolean, char, integer
@@ -630,6 +637,7 @@ public class Compiler {
 				nameSpaces.put(st[0], new HashMap<String ,String>());
 				caslNameSpaces.put(st[0], new HashMap<String ,Integer>());
 				caslNameSpaces.get(st[0]).put("__head", variableCnt);
+				prevVariableCnt = variableCnt; // update
 				nowProgramName = st[0];
 				variableQueue = new ArrayList<String>();
 				subProgramMap.put(st[0], subIndex++);
@@ -1131,6 +1139,7 @@ public class Compiler {
 		if((retName = procedureName(false)).equals("false")) {
 			return false;
 		} 
+
 		mnemonicOneLine tmp1 = new mnemonicOneLine( "" , OPERATOR.PUSH, OPERAND.CONSTADDR
 				, OPERAND.GR1 , OPERAND.NIL, "0",  nowProgramName.equals("_") );
 		outPutBuf.myPush(tmp1);
@@ -1140,6 +1149,20 @@ public class Compiler {
 		tmp1 = new mnemonicOneLine( "" , OPERATOR.PUSH, OPERAND.CONSTADDR
 				, OPERAND.GR3 , OPERAND.NIL, "0",  nowProgramName.equals("_") );
 		outPutBuf.myPush(tmp1);
+
+		for(int i = prevVariableCnt; i < variableCnt; i++) {
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR , 
+					OPERAND.NIL , ""+i ,  nowProgramName.equals("_") ); 
+			outPutBuf.myPush(tmp1);
+			// GR1 = variable
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.LD, OPERAND.GR1, OPERAND.CONSTADDR , 
+					OPERAND.GR2 , "VAR" ,  nowProgramName.equals("_") ); 
+			outPutBuf.myPush(tmp1);
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.PUSH, OPERAND.CONSTADDR
+					, OPERAND.GR1 , OPERAND.NIL, "0",  nowProgramName.equals("_") );
+			outPutBuf.myPush(tmp1);
+		}
+
 
 		tmp1 = new mnemonicOneLine( "" , OPERATOR.LAD, OPERAND.GR4
 				, OPERAND.CONSTADDR , OPERAND.NIL, "0",  nowProgramName.equals("_") );
@@ -1165,6 +1188,19 @@ public class Compiler {
 		tmp1 = new mnemonicOneLine( "" , OPERATOR.CALL, OPERAND.CONSTADDR, OPERAND.NIL , 
 				OPERAND.NIL, "SUBP" + subProgramMap.get(retName),  nowProgramName.equals("_") );
 		outPutBuf.myPush(tmp1);
+		
+		for(int i = variableCnt - 1; i >= prevVariableCnt; i--) {
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.POP, OPERAND.GR1
+					, OPERAND.NIL , OPERAND.NIL, "",  nowProgramName.equals("_") );
+			outPutBuf.myPush(tmp1);
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR , 
+					OPERAND.NIL , ""+i ,  nowProgramName.equals("_") ); 
+			outPutBuf.myPush(tmp1);
+			tmp1 = new mnemonicOneLine( "" , OPERATOR.ST, OPERAND.GR1, OPERAND.CONSTADDR , 
+					OPERAND.GR2 , "VAR" ,  nowProgramName.equals("_") ); 
+			outPutBuf.myPush(tmp1);
+		}
+		
 		tmp1 = new mnemonicOneLine( "" , OPERATOR.POP, OPERAND.GR3
 				, OPERAND.NIL , OPERAND.NIL, "",  nowProgramName.equals("_") );
 		outPutBuf.myPush(tmp1);
@@ -1377,7 +1413,7 @@ public class Compiler {
 		}
 		return ret1;
 	}
-	
+
 	// GR1 <- var or const
 	protected String simpleExpression(String procedureName) {
 		int save_index = index;
@@ -1460,7 +1496,7 @@ public class Compiler {
 		}
 		return ret1;
 	}
-	
+
 	//term() GR2 <- var or const
 	protected String term(String procedureName) {
 		String ret1, ret2;
@@ -1711,8 +1747,8 @@ public class Compiler {
 		if (errorCode == Error.NULL) errorCode = e;
 	}
 
-//------------------------for output-------------------------------------------------------------------
-	
+	//------------------------for output-------------------------------------------------------------------
+
 	protected class outPutBuffer extends LinkedList<mnemonicOneLine> {
 		private static final long serialVersionUID = 1L;
 		LinkedList<mnemonicOneLine> mainProgram = new LinkedList<mnemonicOneLine>();
@@ -1833,6 +1869,7 @@ public class Compiler {
 			}
 
 			try {
+				///*
 				for(mnemonicOneLine line: mainProgram) {
 					String x = (line.label + OpeTable.get(line.op) +  getArgument(line.arg1, line.constAddr) 
 					+ getArgument(line.arg2, line.constAddr) +  getArgument(line.arg3, line.constAddr));
@@ -1846,6 +1883,7 @@ public class Compiler {
 					Files.writeString(Paths.get(outputFileName), x.substring(0, x.length()-2) + "\n", StandardOpenOption.APPEND);
 				}
 				Files.writeString(Paths.get(outputFileName), tailProgram, StandardOpenOption.APPEND);
+				//*/
 			}catch(IOException e){
 				System.out.println(e);
 			}
