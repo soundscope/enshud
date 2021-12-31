@@ -11,9 +11,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
 
 import enshud.casl.CaslSimulator;
 import enshud.s1.lexer.Lexer;
@@ -52,11 +50,11 @@ public class Compiler {
 		//*/
 
 		///*
-		if(true) { //debug
+		if(false) { //debug
 			new Lexer().run("data/pas/abc.pas", "tmp/abc.ts");
 			new Compiler().run("tmp/abc.ts", "tmp/out.cas");
 		} else {
-			new Compiler().run("data/ts/normal19.ts", "tmp/out.cas");
+			new Compiler().run("data/ts/normal05.ts", "tmp/out.cas");
 		}
 		//*/
 
@@ -93,11 +91,10 @@ public class Compiler {
 	int maxDepth = 0; //foresighted depth used for writing error line
 	String constStr = ""; // now constStr (set by constant())
 	int constNum = 0; // now constNumber (set by constant())
+	int integerNum = 0; // now constNumber (set by integer())
 	int constStrIndex = 0; //num of constStr for DC
 	int prevVariableCnt = 0;
 	int variableCnt = 0; //num of variable
-	Stack<Integer> whileNameStack; //stack for manage "while" syntax depth
-	Stack<Integer> ifNameStack; ///stack for manage "if" syntax depth
 
 
 	int subIndex = 0; // num of subProc
@@ -118,7 +115,7 @@ public class Compiler {
 	};
 
 	public void run(final String inputFileName, final String outputFileName)  {
-		errorCode = Error.NULL;
+		errorCode = Error.NULL; 		
 		splittedBuffer = new ArrayList<String []>();
 		variableQueue = new ArrayList<String>();
 		nameSpaces = new HashMap<String,Map<String, String>  >() {
@@ -139,8 +136,6 @@ public class Compiler {
 		nowProgramName = "_";
 		constStr = "";
 
-		whileNameStack = new Stack<Integer>();
-		ifNameStack = new Stack<Integer>();
 		outPutBuf = new outPutBuffer();
 
 		mnemonicOneLine init = new mnemonicOneLine("CASL  START  BEGIN", true);
@@ -356,7 +351,14 @@ public class Compiler {
 					mnemonicOneLine tmp = 
 							new mnemonicOneLine("", OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR, OPERAND.NIL, 
 									""+ caslNameSpaces.get(caller).get(st[0])  ,  caller.equals("_"));
-
+					outPutBuf.myPush(tmp);
+					// ADD G2 offset start index
+					if(caslNameSpaces.get(caller).get("_start_"+st[0]) == null) 
+						return "false";
+					
+					tmp = 
+							new mnemonicOneLine("", OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR, OPERAND.GR2, 
+									""+ (1 - caslNameSpaces.get(caller).get("_start_"+st[0]))  ,  caller.equals("_"));
 					outPutBuf.myPush(tmp);
 				}
 				return nameSpaces.get(caller).get(st[0]);
@@ -368,6 +370,13 @@ public class Compiler {
 								new mnemonicOneLine("", OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR, OPERAND.NIL, 
 										""+ caslNameSpaces.get("_").get(st[0])  ,  caller.equals("_"));
 
+						outPutBuf.myPush(tmp);
+						// ADD G2 offset start index
+						if(caslNameSpaces.get("_").get("_start_"+st[0]) == null) 
+							return "false";
+						tmp = 
+								new mnemonicOneLine("", OPERATOR.LAD, OPERAND.GR2, OPERAND.CONSTADDR, OPERAND.GR2, 
+										""+ (1 - caslNameSpaces.get("_").get("_start_"+st[0]))  ,  caller.equals("_"));
 						outPutBuf.myPush(tmp);
 
 					}
@@ -384,7 +393,7 @@ public class Compiler {
 	protected boolean type() {
 		int save_index = index;
 
-		if(! standardType(0, false)) {
+		if(! standardType(0,0, false)) {
 			index = save_index;
 			if(! arrayType()) {
 				return false;
@@ -394,7 +403,7 @@ public class Compiler {
 		}
 		return true;
 	}	
-	protected boolean standardType(int arrayLen, boolean isParam) {
+	protected boolean standardType(int arrayLen, int arrayStart, boolean isParam) {
 		st = getToken();
 		for(String nowName: variableQueue) {
 			if(arrayLen == 0) { //variable
@@ -416,16 +425,22 @@ public class Compiler {
 				if(st[2].equals("3")) {
 					nameSpaces.get(nowProgramName).put(nowName, "Aboolean");
 					caslNameSpaces.get(nowProgramName).put(nowName, variableCnt);
+					//caslNameSpaces.get(nowProgramName).put("_len_"+nowName, arrayLen);
+					caslNameSpaces.get(nowProgramName).put("_start_"+nowName, arrayStart);
 					variableCnt += arrayLen;
 				}
 				if(st[2].equals("4")) {
 					nameSpaces.get(nowProgramName).put(nowName, "Achar");
 					caslNameSpaces.get(nowProgramName).put(nowName, variableCnt);
+					//caslNameSpaces.get(nowProgramName).put("_len_"+nowName, arrayLen);
+					caslNameSpaces.get(nowProgramName).put("_start_"+nowName, arrayStart);
 					variableCnt += arrayLen;
 				}
 				if(st[2].equals("11")) {
 					nameSpaces.get(nowProgramName).put(nowName, "Ainteger");
 					caslNameSpaces.get(nowProgramName).put(nowName, variableCnt);
+					//caslNameSpaces.get(nowProgramName).put("_len_"+nowName, arrayLen);
+					caslNameSpaces.get(nowProgramName).put("_start_"+nowName, arrayStart);
 					variableCnt += arrayLen;
 				}
 			}
@@ -452,7 +467,14 @@ public class Compiler {
 		if(! indexMinimum() ) {
 			return false;
 		}
-		arrayLen -= Integer.parseInt(st[0]);
+		int arrayStart = integerNum;
+		arrayLen -= integerNum;
+		/*
+		if (arrayLen < 1) {
+			raiseError(Error.CHECK);
+			return false;
+		}
+		*/
 		st = getToken();
 		// ..
 		if(! st[2].equals("39")) {
@@ -461,7 +483,7 @@ public class Compiler {
 		if(! indexMaximum()) {
 			return false;
 		}
-		arrayLen += Integer.parseInt(st[0]);
+		arrayLen += integerNum;
 		st = getToken();
 		// ]
 		if(! st[2].equals("36")) {
@@ -472,7 +494,7 @@ public class Compiler {
 		if(! st[2].equals("14")) {
 			return false;
 		}
-		if(! standardType(arrayLen, false)) {
+		if(! standardType(arrayLen, arrayStart, false)) {
 			return false;
 		}
 		return true;
@@ -515,6 +537,7 @@ public class Compiler {
 			raiseError(Error.CHECK);
 			return false;
 		}
+		integerNum = checkInt;
 		return true;
 	}
 
@@ -692,7 +715,7 @@ public class Compiler {
 		if(! st[2].equals("38")) {
 			return false;
 		}
-		if(! standardType(0, true)) {
+		if(! standardType(0,0, true)) {
 			return false;
 		}
 
@@ -709,7 +732,7 @@ public class Compiler {
 				if(! st[2].equals("38")) {
 					return false;
 				}
-				if(! standardType(0, true)) {
+				if(! standardType(0,0, true)) {
 					return false;
 				}
 			} else {
@@ -824,11 +847,13 @@ public class Compiler {
 			index = save_index;
 
 			st = getToken();
+			
+			int nowWhileIndex = whileIndexMax++;
 			//while
 			if(st[2].equals("22")) {
 
 				mnemonicOneLine tmp = 
-						new mnemonicOneLine("WHILE" + whileIndexMax, OPERATOR.NOP, OPERAND.NIL
+						new mnemonicOneLine("WHL" + nowWhileIndex, OPERATOR.NOP, OPERAND.NIL
 								, OPERAND.NIL, OPERAND.NIL, "" ,  nowProgramName.equals("_"));
 
 				outPutBuf.myPush(tmp);
@@ -846,12 +871,8 @@ public class Compiler {
 
 				tmp = 
 						new mnemonicOneLine("" , OPERATOR.JZE, OPERAND.CONSTADDR
-								, OPERAND.NIL, OPERAND.NIL, "LP" + whileIndexMax + "END1" ,  nowProgramName.equals("_"));
+								, OPERAND.NIL, OPERAND.NIL, "LP" + nowWhileIndex + "ED1" ,  nowProgramName.equals("_"));
 				outPutBuf.myPush(tmp);
-
-
-
-				whileNameStack.add(whileIndexMax++);
 
 				st = getToken();
 				//do
@@ -861,13 +882,11 @@ public class Compiler {
 				if (! compoundSentence()) {
 					return false;
 				}
-				int last = whileNameStack.pop();
 
-
-				tmp = new mnemonicOneLine( "LP"+last+"END0", OPERATOR.JUMP, OPERAND.CONSTADDR
-						, OPERAND.NIL, OPERAND.NIL, "WHILE" + last ,  nowProgramName.equals("_"));
+				tmp = new mnemonicOneLine( "", OPERATOR.JUMP, OPERAND.CONSTADDR
+						, OPERAND.NIL, OPERAND.NIL, "WHL" + nowWhileIndex ,  nowProgramName.equals("_"));
 				outPutBuf.myPush(tmp);
-				tmp = new mnemonicOneLine( "LP"+last+"END1", OPERATOR.NOP, OPERAND.NIL
+				tmp = new mnemonicOneLine( "LP"+nowWhileIndex+"ED1", OPERATOR.NOP, OPERAND.NIL
 						, OPERAND.NIL, OPERAND.NIL, "" ,  nowProgramName.equals("_"));
 				outPutBuf.myPush(tmp);
 
@@ -883,12 +902,11 @@ public class Compiler {
 						, OPERAND.CONSTADDR, OPERAND.NIL, "=0",  nowProgramName.equals("_") );
 				outPutBuf.myPush(tmp1);
 				mnemonicOneLine tmp2 = new mnemonicOneLine( "" , OPERATOR.JZE, OPERAND.CONSTADDR
-						, OPERAND.NIL, OPERAND.NIL, "ELSE" + nowDepth ,  nowProgramName.equals("_") );
+						, OPERAND.NIL, OPERAND.NIL, "E" + nowDepth ,  nowProgramName.equals("_") );
 				outPutBuf.myPush(tmp2);
 
 
 				st = getToken();
-				ifNameStack.push(nowDepth);
 				//then
 				if(! st[2].equals("19")) {
 					return false;
@@ -896,18 +914,16 @@ public class Compiler {
 				if(! compoundSentence()) {
 					return false;
 				}
-				int last = ifNameStack.pop();
 
 				tmp1 = new mnemonicOneLine( "" , OPERATOR.JUMP, OPERAND.CONSTADDR
-						, OPERAND.NIL , OPERAND.NIL, "FIN"+last,  nowProgramName.equals("_") );
+						, OPERAND.NIL , OPERAND.NIL, "F"+nowDepth,  nowProgramName.equals("_") );
 				outPutBuf.myPush(tmp1);
-				tmp1 =  new mnemonicOneLine( "ELSE" + last , OPERATOR.NOP, OPERAND.NIL
+				tmp1 =  new mnemonicOneLine( "E" + nowDepth , OPERATOR.NOP, OPERAND.NIL
 						, OPERAND.NIL , OPERAND.NIL, "" ,  nowProgramName.equals("_") );
 				outPutBuf.myPush(tmp1);
 				// else
 				int save_index2 = index;
 				st = getToken();
-				ifNameStack.push(nowDepth);
 				if(st[2].equals("7")) {
 					if(! compoundSentence()) {
 						return false;
@@ -915,9 +931,8 @@ public class Compiler {
 				} else {
 					index = save_index2;
 				}
-				int last2 = ifNameStack.pop() ;
 
-				tmp1 = new mnemonicOneLine( "FIN"+last2 , OPERATOR.NOP, OPERAND.NIL
+				tmp1 = new mnemonicOneLine( "F"+nowDepth , OPERATOR.NOP, OPERAND.NIL
 						, OPERAND.NIL , OPERAND.NIL, "",  nowProgramName.equals("_") );
 				outPutBuf.myPush(tmp1);
 
@@ -958,7 +973,7 @@ public class Compiler {
 			st = getToken();
 			//(
 			if(st[2].equals("33")) {
-				if(! variableList(false)) {
+				if(! variableList()) {
 					return false;
 				}
 
@@ -999,14 +1014,14 @@ public class Compiler {
 		return true;
 	}
 
-	protected boolean variableList(boolean declare) {
-		if(variable(declare).equals("false")) {
+	protected boolean variableList() {
+		if(variable(false).equals("false")) {
 			return false;
 		}
 		for(;;) {
 			int save_index = index;
 			if(st[2].equals("41")) {
-				if(variable(declare).equals("false")) {
+				if(variable(false).equals("false")) {
 					return false;
 				}
 			} else {
@@ -1079,7 +1094,7 @@ public class Compiler {
 
 	protected String indexedVariable(boolean declare) {
 		String ret;
-		if((ret = variableName(nowProgramName,declare,true)).equals("false")) {
+		if((ret = variableName(nowProgramName,false,true)).equals("false")) {
 			return "false";
 		}
 
